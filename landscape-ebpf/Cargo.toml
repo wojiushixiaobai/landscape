@@ -37,7 +37,7 @@ libbpf-cargo = { workspace = true }
 vmlinux = { git = "https://github.com/libbpf/vmlinux.h.git", rev = "83a228cf37fc65f2d14e4896a04922b5ee531a94" }
 
 [features]
-default = []
+default = ["libbpf-sys/vendored"]
 # # autoconf automake libtool pkg-config m4 make cmake clang llvm autopoint gawk
 # apt-get install musl-tools musl-dev libargp-dev
-static = ["libbpf-sys/static", "libbpf-sys/vendored"]
+static = ["libbpf-sys/vendored"]
