@@ -190,3 +190,15 @@ pingora = { version = "0.8.0", default-features = false, features = [
     "lb",
     "rustls",
 ] }
+
+[target.'cfg(target_arch = "powerpc64")'.dependencies]
+libbpf-sys = { version = "1.6.3", default-features = false, features = ["vendored"] }
+
+[target.'cfg(target_arch = "riscv64")'.dependencies]
+libbpf-sys = { version = "1.6.3", default-features = false, features = ["vendored"] }
+
+[target.'cfg(target_arch = "s390x")'.dependencies]
+libbpf-sys = { version = "1.6.3", default-features = false, features = ["vendored"] }
+
+[target.'cfg(target_arch = "loongarch64")'.dependencies]
+libbpf-sys = { version = "1.6.3", default-features = false, features = ["vendored"] }
