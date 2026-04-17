@@ -166,7 +166,7 @@ tracing-appender = "0.2.4"
 # ============================================================================
 libbpf-rs = { version = "0.26.1" }
 libbpf-cargo = { version = "0.26.1" }
-libbpf-sys = { version = "1.6.3" }
+libbpf-sys = { version = "1.6.3", default-features = false, features = ["vendored"] }
 
 # ============================================================================
 # Code Generation & Macros

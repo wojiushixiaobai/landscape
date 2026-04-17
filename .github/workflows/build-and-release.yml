@@ -8,9 +8,7 @@ on:
       - 'build'
 
 env:
-  sccache_version: 'v0.12.0'
-  zlib_version: '1.3.1'
-  elfutils_version: '0.192'
+  sccache_version: 'v0.14.0'
 
 jobs:
   linux-build:
@@ -35,7 +33,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install dependencies
         run: |
@@ -84,13 +82,13 @@ jobs:
 
       - name: Upload OpenAPI spec
         if: matrix.settings.architecture == 'aarch64'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: openapi-spec
           path: landscape-types/openapi.json
 
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: landscape-webserver-${{ matrix.settings.target }}
           path: output/*
@@ -137,22 +135,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake clang curl gcc llvm make pkg-config libelf-dev libclang-dev zlib1g-dev zstd
 
-      - name: Cache cross-libraries
-        id: cache-cross-libs
-        uses: actions/cache@v4
-        with:
-          path: /usr/${{ matrix.settings.architecture }}-linux-gnu
-          key: cross-libs-${{ matrix.settings.target }}-${{ env.zlib_version }}-${{ env.elfutils_version }}
-
       - name: Setup cross-tools
-        if: steps.cache-cross-libs.outputs.cache-hit != 'true'
         run: |
           ARCH=${{ matrix.settings.architecture }}
           case "$ARCH" in
@@ -172,40 +162,13 @@ jobs:
           sudo update-alternatives --install /usr/bin/${TOOLCHAIN_TRIPLET}-g++ ${TOOLCHAIN_TRIPLET}-g++ /usr/bin/${TOOLCHAIN_TRIPLET}-g++-13 100
           sudo update-alternatives --install /usr/bin/${TOOLCHAIN_TRIPLET}-cpp ${TOOLCHAIN_TRIPLET}-cpp /usr/bin/${TOOLCHAIN_TRIPLET}-cpp-13 100
 
-          cd /tmp
-          wget -q https://github.com/madler/zlib/releases/download/v${zlib_version}/zlib-${zlib_version}.tar.gz
-          wget -q https://sourceware.org/elfutils/ftp/${elfutils_version}/elfutils-${elfutils_version}.tar.bz2
-          tar xf zlib-${zlib_version}.tar.gz
-          tar xf elfutils-${elfutils_version}.tar.bz2
-
-          export CC=${TOOLCHAIN_TRIPLET}-gcc
-          export CXX=${TOOLCHAIN_TRIPLET}-g++
-          export PREFIX=/usr/${TOOLCHAIN_TRIPLET}
-
-          # Build Zlib
-          cd /tmp/zlib-${zlib_version}
-          CHOST=${TOOLCHAIN_TRIPLET} ./configure --prefix=${PREFIX}
-          make -j$(nproc)
-          sudo make install
-
-          # Build Elfutils
-          cd /tmp/elfutils-${elfutils_version}
-          ./configure --host=${TOOLCHAIN_TRIPLET} --prefix=${PREFIX} --with-zlib=${PREFIX} --disable-libdebuginfod --disable-debuginfod \
-            CFLAGS="-I${PREFIX}/include" LDFLAGS="-L${PREFIX}/lib -Wl,-rpath,${PREFIX}/lib" LIBS="-lz"
-          make -j$(nproc)
-          sudo make install
-
-      - name: Install cross-compilers (if cache hit)
-        if: steps.cache-cross-libs.outputs.cache-hit == 'true'
+      - name: Setup sccache
         run: |
-          ARCH=${{ matrix.settings.architecture }}
-          TOOLCHAIN_TRIPLET="${ARCH}-linux-gnu"
-          [ "$ARCH" = "armv7l" ] && TOOLCHAIN_TRIPLET="arm-linux-gnueabihf"
-
-          sudo apt-get update
-          sudo apt-get install -y g++-13-${TOOLCHAIN_TRIPLET} gcc-13-${TOOLCHAIN_TRIPLET}
-          sudo update-alternatives --install /usr/bin/${TOOLCHAIN_TRIPLET}-gcc ${TOOLCHAIN_TRIPLET}-gcc /usr/bin/${TOOLCHAIN_TRIPLET}-gcc-13 100
-          sudo update-alternatives --install /usr/bin/${TOOLCHAIN_TRIPLET}-g++ ${TOOLCHAIN_TRIPLET}-g++ /usr/bin/${TOOLCHAIN_TRIPLET}-g++-13 100
+          sccache_arch=${{ matrix.settings.architecture }}
+          if [ "${sccache_arch}" = "x86_64" ] || [ "${sccache_arch}" = "aarch64" ]; then
+            wget -qO- https://github.com/mozilla/sccache/releases/download/${sccache_version}/sccache-${sccache_version}-${sccache_arch}-unknown-linux-musl.tar.gz | tar -xzf - -C /usr/local/bin/ --strip-components=1
+            echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          fi
 
       - name: Setup rust
         uses: dtolnay/rust-toolchain@stable
@@ -213,6 +176,14 @@ jobs:
           toolchain: ${{ matrix.settings.toolchain }}
           targets: ${{ matrix.settings.target }}
           components: rustfmt
+
+      - name: Setup cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/sccache
+          key: ${{ runner.os }}-${{ matrix.settings.target }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-${{ matrix.settings.target }}-
 
       - name: Build binaries
         run: |
@@ -230,7 +201,7 @@ jobs:
             cp target/${{ matrix.settings.target }}/release/redirect_pkg_handler output/redirect_pkg_handler-${{ matrix.settings.architecture }}
 
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: landscape-webserver-${{ matrix.settings.target }}
           path: output/*
@@ -254,7 +225,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup sccache
         run: |
@@ -287,7 +258,7 @@ jobs:
           cp target/release/redirect_pkg_handler output/redirect_pkg_handler-${{ matrix.settings.architecture }}-musl
 
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: landscape-webserver-${{ matrix.settings.target }}
           path: output/*
@@ -298,10 +269,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Download OpenAPI spec
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: openapi-spec
           path: landscape-types
@@ -341,7 +312,7 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=8192
 
       - name: Upload frontend
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: landscape-frontend-none-all
           path: output/static.zip
@@ -353,10 +324,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Download binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: landscape-*
           path: output
